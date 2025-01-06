@@ -1,0 +1,111 @@
+ParsedData: type = {
+   // data members
+   public pairs: std::vector<std::pair<i32, i32>> = ();
+   public page_lists: std::vector<std::vector<i32>> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+
+      // read pairs
+      while ( std::getline( inputStream, line ) ) {
+         if ( line.empty() ) {
+            break;
+         }
+
+         pos := line.find('|');
+         l := std::stoi( line.substr( 0, pos ) );
+         r := std::stoi( line.substr( pos + 1) );
+         pairs.push_back( std::pair<i32, i32>( l, r ) );
+      }
+
+      // read page lists
+      while ( std::getline( inputStream, line ) ) {
+         page_lists.push_back( std::vector<i32>() );
+         pos : size_t = 0;
+         while true {
+            n := std::stoi( line.substr( pos ) );
+            page_lists.back().push_back( n );
+
+            pos = line.find(",", pos);
+            if ( pos == std::string::npos ) {
+               break;
+            }
+            pos += 1;
+         }
+      }
+   }
+}
+
+is_page_less: ( l: i32, r: i32, pairs: std::vector<std::pair<i32, i32>> ) -> bool = {
+   for pairs do (p) {
+      if ( p.first == l && p.second == r ) {
+         return true;
+      }
+      else if ( p.first == r && p.second == l ) {
+         return false;
+      }
+   }      
+
+   return true;
+}
+
+is_valid_page_list: (page_list: std::vector<i32>, pairs: std::vector<std::pair<i32, i32>>) -> bool = {
+   idx := 0; // First page is always valid
+   while (idx < page_list.ssize()) next idx++ {
+      fidx := idx + 1;
+      while (fidx < page_list.ssize()) next fidx++ {
+         if ( !is_page_less( page_list[idx], page_list[ fidx ], pairs ) ) {
+            return false;
+         }
+      }
+   }
+
+   return true;
+}
+
+solve_part1: (data: ParsedData) = {
+   sum := 0;
+   for data.page_lists do (pages) {
+      if is_valid_page_list( pages, data.pairs ) {
+         sum += pages[ pages.ssize() / 2 ];
+      }
+   }
+
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum := 0;
+   for data.page_lists do (pages) {
+      if !is_valid_page_list( pages, data.pairs ) {
+         sorted_pages := std::vector<i32>();
+
+         // do a quick insertion sort
+         for pages do (p) {
+            iter := sorted_pages.begin();
+            while iter != sorted_pages.end() && is_page_less(iter*, p, data.pairs) next iter++ 
+            {}
+            _ = sorted_pages.insert(iter, p);
+         }
+
+         sum += sorted_pages[ pages.ssize() / 2 ];
+      }
+   }
+   std::cout << "Part Two: " << sum << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

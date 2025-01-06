@@ -1,0 +1,145 @@
+ParsedData: type = {
+   // data members
+   public line : std::string = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      std::getline( inputStream, line );
+   }
+
+   generate_output: (this) -> std::vector<i32> = {
+      output := std::vector<i32>();
+      l_idx := 0;
+      while l_idx < line.ssize() {
+         // Add this many elements of fn
+         count := line[ l_idx ] - '0';
+         i := 1;
+         while i <= count next i++ {
+            fn := l_idx / 2;
+            output.push_back(fn);
+         }
+
+         if l_idx == line.ssize() - 1 {
+            break;
+         }
+         
+         gap := line[ l_idx + 1 ] - '0';
+         i = 1;
+         while i <= gap next i++ {
+            output.push_back(-1);
+         }
+         l_idx += 2;
+      }
+      return output;
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   output := data.generate_output();
+   
+   gap_iter := std::find( output.begin(), output.end(), -1 );
+   r_iter := output.end() - 1;
+   while gap_iter < r_iter {
+      while gap_iter < r_iter && gap_iter* == -1 && r_iter* != -1 {
+         gap_iter* = r_iter*;
+         r_iter* = -1;
+         
+         while gap_iter < r_iter && gap_iter* != -1 next gap_iter++ {}
+         while gap_iter < r_iter && r_iter* == -1 next r_iter-- {}
+      }
+   }
+      
+   //for output do (i) {
+   //   if i == -1 {
+   //      std::cout << '.';
+   //   }
+   //   else {
+   //      std::cout << i;
+   //   }
+   //}
+
+   idx := 0;
+   for output next idx++ do (elem) {
+      if elem != -1 {
+         sum += elem * idx;
+      }
+   }
+
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   line := data.line;
+   output := data.generate_output();
+   
+   r_iter := output.end() - 1;
+   while r_iter != output.begin() {
+      r_end := r_iter;
+      while (r_iter* == r_end* && r_iter != output.begin()) next r_iter-- {}
+
+      if r_iter != output.begin() {
+
+         // Go through all the gaps
+         gap_iter := std::find( output.begin(), output.end(), -1 );
+         while gap_iter < r_iter {
+            gap_end := gap_iter;
+            while gap_end* == -1 next gap_end++ {}
+
+            g_len := std::distance( gap_iter, gap_end );
+            r_len := std::distance( r_iter, r_end );
+
+            if r_len <= g_len {
+               while r_iter != r_end {
+                  gap_iter* = r_end*;
+                  gap_iter++;
+                  r_end* = -1;
+                  r_end--;
+               }
+               break;
+            }
+            else {
+               // search for a bigger gap
+               gap_iter = std::find( gap_end, output.end(), -1 );
+            }
+         }
+
+         // find the next num
+         while r_iter != output.begin() && r_iter* == -1 next r_iter-- {}
+      }
+   }
+
+   //for output do (i) {
+   //   if i == -1 {
+   //      std::cout << '.';
+   //   }
+   //   else {
+   //      std::cout << i;
+   //   }
+   //}
+
+   idx := 0;
+   for output next idx++ do (elem) {
+      if elem != -1 {
+         sum += elem * idx;
+      }
+   }
+
+   std::cout << "Part Two: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

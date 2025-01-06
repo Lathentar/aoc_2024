@@ -1,0 +1,116 @@
+ParsedData: type = {
+   // data members
+   public input : std::string = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      while ( inputStream.good() )
+      {
+         c := ' ';
+         inputStream.get( c );
+         input += c;
+      }
+   }
+}
+
+solve: (data: ParsedData, allow_disable : bool) -> i32 = {
+   iter := data.input.begin();
+   sum := 0;
+   enabled := true;
+   while std::distance( iter, data.input.end() ) >= 7 {
+      sview := std::string_view( iter*& );
+      if allow_disable && sview.starts_with( "don\'t()" ) {
+         iter += 7;
+         enabled = false;
+      }
+      else if sview.starts_with( "do()" ) {
+         iter += 4;
+         enabled = true;
+      }
+      else if enabled && sview.starts_with( "mul(" ) {
+         iter += 4;
+
+         // Read up to three digits
+         lhs := 0;
+         rhs := 0;
+         valid := false;
+         if ( '0' <= (iter)* <= '9' ) {
+            lhs = lhs * 10 + (iter)* - '0';
+            iter += 1;
+
+            if ( '0' <= (iter)* <= '9' ) {
+               lhs = lhs * 10 + (iter)* - '0';
+               iter += 1;
+
+               if ( '0' <= (iter)* <= '9' ) {
+                  lhs = lhs * 10 + (iter)* - '0';
+                  iter += 1;
+               }
+            }
+            
+            if ( (iter)* == ',' ) {
+               valid = true;
+            }
+         }
+         
+         if ( !valid ) {
+            continue;
+         }
+
+         iter += 1;
+         valid = false;
+         if ( '0' <= (iter)* <= '9' ) {
+            rhs = rhs * 10 + (iter)* - '0';
+            iter += 1;
+
+            if ( '0' <= (iter)* <= '9' ) {
+               rhs = rhs * 10 + (iter)* - '0';
+               iter += 1;
+
+               if ( '0' <= (iter)* <= '9' ) {
+                  rhs = rhs * 10 + (iter)* - '0';
+                  iter += 1;
+               }
+            }
+            
+            if ( (iter)* == ')' ) {
+               valid = true;
+            }
+         }
+         
+         if ( !valid ) {
+            continue;
+         }
+
+         iter += 1;
+         sum += lhs * rhs;
+      }
+      else {
+         iter += 1;
+      }
+   }
+   return sum;
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << solve( data, false ) << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   std::cout << "Part Two: " << solve( data, true ) << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

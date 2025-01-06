@@ -1,0 +1,108 @@
+BridgeData: type = {
+   public total: i64;
+   public vals: std::vector<i64> = ();
+
+   operator=: (out this, that) = {}
+
+   operator=: (out this, line: std::string) = {
+      total = std::stoll( line );
+
+      pos : size_t = line.find(" ") + 1;
+      while true {
+         n := std::stoi( line.substr( pos ) );
+         vals.push_back( n );
+
+         pos = line.find(" ", pos);
+         if ( pos == std::string::npos ) {
+            break;
+         }
+         pos += 1;
+      }
+   }
+
+   has_solution: (this, use_concat: bool) -> bool = {
+      return find_solution_recursive( vals.begin()*, vals.begin() + 1, use_concat);
+   }
+
+   private find_solution_recursive: (this, amount: i64, cur: std::vector<i64>::const_iterator, use_concat: bool) -> bool = {
+      if cur == vals.end() {
+         return amount == total;
+      }
+      else if amount > total {
+         return false;
+      }
+
+      if use_concat {
+         new_amount := amount;
+         multi := cur*;
+         while multi > 0 {
+            new_amount *= 10;
+            multi /= 10;
+         }
+         new_amount += cur*;
+         if find_solution_recursive( new_amount, cur + 1, use_concat ) {
+            return true;
+         }
+      }
+      
+      if find_solution_recursive( amount * cur*, cur + 1, use_concat ) {
+         return true;
+      }
+      
+      if find_solution_recursive( amount + cur*, cur + 1, use_concat ) {
+         return true;
+      }
+
+      return false;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   public bridge_data: std::vector<BridgeData> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         bridge_data.emplace_back( line );
+      }
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.bridge_data do (bd) {
+      if bd.has_solution(false) {
+         sum += bd.total;
+      }
+   }
+
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.bridge_data do (bd) {
+      if bd.has_solution(true) {
+         sum += bd.total;
+      }
+   }
+
+   std::cout << "Part Two: " << sum << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

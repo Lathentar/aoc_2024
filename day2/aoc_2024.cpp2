@@ -1,0 +1,97 @@
+ParsedData: type = {
+   // data members
+   public levels: std::vector<std::vector<i32>> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) )
+      {
+         levels.push_back( std::vector<i32>() );
+         strStream := std::stringstream( line );
+         while ( strStream.good() )
+         {
+            i := 0;
+            strStream >> i;
+            levels.back().push_back( i );
+         }
+      }
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   safe_levels := 0;
+   for data.levels do (lvl) {
+      i := 1;
+      dir := lvl[i] > lvl[i-1];
+      while i < lvl.ssize() {
+         if ( lvl[ i ] == lvl[ i - 1 ] ) {
+            break;
+         }
+         if ( lvl[ i ] > lvl[ i - 1 ] ) != dir {
+            break;
+         }
+         if std::abs( lvl[ i ] - lvl[ i - 1 ] ) > 3 {
+            break;
+         }
+         i += 1;
+      }
+      if i == lvl.ssize() {
+         safe_levels += 1;
+      }
+   }
+
+   std::cout << "Part One: " << safe_levels << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   safe_levels := 0;
+   for data.levels do (lvl) {
+      k := 0;
+
+      while k < lvl.ssize() {
+         i := 1;
+         if ( k == 1 ) {
+            i = 2;
+         }
+         dir := lvl[i] > lvl[0];
+         while i < lvl.ssize() {
+            if i != k {
+               if ( lvl[ i ] == lvl[ i - 1 ] ) {
+                  break;
+               }
+               if ( lvl[ i ] > lvl[ i - 1 ] ) != dir {
+                  break;
+               }
+               if std::abs( lvl[ i ] - lvl[ i - 1 ] ) > 3 {
+                  break;
+               }
+            }
+            i += 1;
+         }
+         if i == lvl.ssize() {
+            safe_levels += 1;
+            break;
+         }
+         else {
+            k += 1;
+         }
+      }
+   }
+   std::cout << "Part Two: " << safe_levels << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

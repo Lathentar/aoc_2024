@@ -1,0 +1,215 @@
+Computer: type = {
+   register_a: i64 = 0;
+   register_b: i64 = 0;
+   register_c: i64 = 0;
+   ip: i64 = 0;
+   output: std::vector<i64> = ();
+
+   operator=: (out this, a: i64, b : i64, c : i64) = {
+      register_a = a;
+      register_b = b;
+      register_c = c;
+   }
+
+   run_program: (inout this, program: std::vector<i64>) = {
+      ip = 0;
+      output.clear();
+      while ip < program.ssize() - 1 {
+         process_instruction(program[ip], program[ip + 1]);
+      }
+   }
+
+   get_output: (this) -> std::vector<i64> = {
+      return output;
+   }
+
+   solve: (inout this, program: std::vector<i64>) -> i64 = {
+      register_a = 0;
+      register_b = 0;
+      register_c = 0;
+      num := solve_recurse( program );
+      if num.has_value() {
+         return num*;
+      }
+      return -1;
+   }
+
+   private solve_recurse: (inout this, program: std::vector<i64>) -> std::optional<i64> = {
+      // Solve 3 bits at a time working backwards
+      base_a := register_a;
+      num := 0;
+      next_num: while (num < 8) next num++ {
+         test_a := base_a * 8 + num;
+         register_a = test_a;
+         register_b = 0;
+         register_c = 0;
+         run_program( program );
+
+         // Validate the output
+         idx := output.ssize();
+         while idx > 0 next idx-- {
+            if program[ program.ssize() - idx ] != output[ output.ssize() - idx ]{
+               // Mismatch, try the next number
+               continue next_num;
+            }
+         }
+
+         if ( output.size() == program.size() ) {
+            // we're done!
+            return std::optional<i64>( test_a );
+         }
+         else {
+            register_a = test_a;
+            ret := solve_recurse( program );
+            if ret.has_value() {
+               return ret;
+            }
+         }
+      }
+
+      return std::optional<i64>();
+   }
+
+   private process_instruction: (inout this, opcode: i64, operand: i64) = {
+      jump_ip := true;
+
+      // The adv instruction (opcode 0) performs division. The numerator is the value in the A register.
+      // The denominator is found by raising 2 to the power of the instruction's combo operand. 
+      // (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) 
+      // The result of the division operation is truncated to an integer and then written to the A register.
+      if opcode == 0 {
+         register_a = register_a >> combo_operand_value( operand );
+      }
+      // The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand,
+      // then stores the result in register B.
+      if opcode == 1 {
+         register_b = register_b ^ operand;
+      }
+      // The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), 
+      // then writes that value to the B register.
+      if opcode == 2 {
+         register_b = combo_operand_value( operand ) % 8;
+      }
+      // The jnz instruction (opcode 3) does nothing if the A register is 0. 
+      // However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; 
+      // if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
+      if opcode == 3 {
+         if register_a != 0 {
+            ip = operand;
+            jump_ip = false;
+         }
+      }
+      // The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, 
+      // then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
+      if opcode == 4 {
+         register_b = register_b ^ register_c;
+      }
+      // The out instruction (opcode 5) calculates the value of its combo operand modulo 8, 
+      // then outputs that value. (If a program outputs multiple values, they are separated by commas.)
+      if opcode == 5 {
+         val := combo_operand_value( operand ) % 8;
+         output.push_back( val );
+      }
+      // The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. 
+      // (The numerator is still read from the A register.)
+      if opcode == 6 {
+         register_b = register_a >> combo_operand_value( operand );
+      }
+      
+      // The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. 
+      // (The numerator is still read from the A register.)
+      if opcode == 7 {
+         register_c = register_a >> combo_operand_value( operand );
+      }
+
+      if jump_ip {
+         ip += 2;
+      }
+   }
+
+   private combo_operand_value: (this, operand: i64)->i64 = {
+      // Combo operands 0 through 3 represent literal values 0 through 3.
+      // Combo operand 4 represents the value of register A.
+      // Combo operand 5 represents the value of register B.
+      // Combo operand 6 represents the value of register C.
+      // Combo operand 7 is reserved and will not appear in valid programs.
+      if 0 <= operand <= 3 {
+         return operand;
+      }
+      if operand == 4 {
+         return register_a;
+      }
+      if operand == 5 {
+         return register_b;
+      }
+      if operand == 6 {
+         return register_c;
+      }
+
+      // Nothing else should be valid
+      return 0;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   reg_a: i64 = 0;
+   reg_b: i64 = 0;
+   reg_c: i64 = 0;
+   public program: std::vector<i64> = std::vector<i64>();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      getline( inputStream, line ); // Register A: XXX
+      reg_a = std::stoi( line.substr( line.find(":") + 1 ) );
+      getline( inputStream, line ); // Register B: XXX
+      reg_b = std::stoi( line.substr( line.find(":") + 1 ) );
+      getline( inputStream, line ); // Register C: XXX
+      reg_c = std::stoi( line.substr( line.find(":") + 1 ) );
+      getline( inputStream, line );   // <empty line>
+      getline( inputStream, line );   // Program: X,Y,Z...
+      pos := line.find(":");
+      while pos != std::string::npos {
+         pos += 1;
+         program.push_back( std::stoi(line.substr(pos)) );
+         pos = line.find(",", pos);
+      }
+   }
+
+   init_computer: (this) -> Computer = {
+      return Computer(reg_a, reg_b, reg_c);
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   comp: Computer = data.init_computer();
+   comp.run_program( data.program );   // Would like to return the output here, but then this is the last usage of comp
+   std::cout << "Part One: " << std::endl;
+   for comp.get_output() do (i) {
+      std::cout << i << ",";
+   }
+   std::cout << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   comp: Computer = data.init_computer();
+   num := comp.solve( data.program );
+   _ = comp.get_output();  // Without this comp tries to move when calling solve even though it's marked inout
+   std::cout << "Part Two: (num)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

@@ -1,0 +1,195 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+operator+ : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
+Direction: @enum type = {
+   North;
+   South;
+   East;
+   West;
+
+   cw: (this) -> Direction = {
+      if this == North {
+         return East;
+      }
+      else if this == East {
+         return South;
+      }
+      else if this == South {
+         return West;
+      }
+      else if this == West {
+         return North;
+      }
+      return this;
+   }
+   
+   ccw: (this) -> Direction = {
+      if this == North {
+         return West;
+      }
+      else if this == East {
+         return North;
+      }
+      else if this == South {
+         return East;
+      }
+      else if this == West {
+         return South;
+      }
+      return this;
+   }
+
+   delta: (this) -> Point = {
+      if this == North {
+         return Point(0, -1);
+      }
+      else if this == East {
+         return Point(1, 0);
+      }
+      else if this == South {
+         return Point(0, 1);
+      }
+      else if this == West {
+         return Point(-1, 0);
+      }
+      return Point(0, 0);
+   }
+}
+
+Node: @value type = {
+   public pos : Point = Point(0, 0);
+   public dir : Direction = Direction::East;
+
+   operator=: (out this, p: Point, d : Direction) = {
+      pos = p;
+      dir = d;
+   }
+}
+
+ScoreNode : @value type = {
+   public nodes : std::vector<Node> = ();
+   public score : i64 = 0;
+
+   operator=: (out this, n, s: i64) = {
+      nodes.push_back(n);
+      score = s;
+   }
+
+   operator< : (this, that) -> bool = {
+      return score > that.score;
+   }
+}
+
+ParsedData: type = {
+   // data members   
+   public grid: std::vector<std::vector<char>> = ();
+   public start_pt : Point = Point(0, 0);
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            if ch == 'S' {
+               start_pt = Point( grid.back().ssize(), grid.ssize() - 1 );
+            }
+            grid.back().push_back(ch);
+         }
+      }
+   }
+}
+
+solve_parts: (data: ParsedData) = {
+   nodes := std::priority_queue<ScoreNode>();
+   nodes.push( ScoreNode( Node( data.start_pt, Direction::East ), 0ll ) );
+
+   best_nodes := std::map<Node, i64>();
+   best_score : i64 = std::numeric_limits<i64>::max();
+
+   path_positions := std::set<Point>();
+   
+   while !nodes.empty() {
+      score_node := nodes.top();
+      node := score_node.nodes.back();
+      nodes.pop();
+
+      if score_node.score > best_score {
+         continue;
+      }
+
+      if best_nodes.contains( node ) {
+         if score_node.score > best_nodes[node] {
+            continue;
+         }
+         else {
+            best_nodes[node] = score_node.score;
+         }
+      }
+      else {
+         best_nodes.insert( std::pair( node, score_node.score ) );
+      }
+
+      if data.grid[ node.pos.y ][ node.pos.x ] == 'E' {
+         best_score = std::min( best_score, score_node.score );
+
+         for score_node.nodes do (np) {
+            path_positions.insert(np.pos);
+         }
+
+         continue;
+      }
+
+      // Move in current direction
+      {
+         tp := node.pos + node.dir.delta();
+         if data.grid[tp.y][tp.x] != '#' {
+            new_node := score_node;
+            new_node.nodes.push_back( Node( tp, node.dir ) );
+            new_node.score += 1;
+            nodes.push( new_node );
+         }
+      }
+      // Rotate
+      {
+         new_node := score_node;
+         new_node.nodes.push_back( Node( node.pos, node.dir.cw() ) );
+         new_node.score += 1000;
+         nodes.push( new_node );
+      }
+      {
+         new_node := score_node;
+         new_node.nodes.push_back( Node( node.pos, node.dir.ccw() ) );
+         new_node.score += 1000;
+         nodes.push( new_node );
+      }
+   }
+
+   std::cout << "Part One: " << best_score << std::endl;
+   std::cout << "Part Two: " << path_positions.ssize() << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_parts( parsed_data );
+}
+

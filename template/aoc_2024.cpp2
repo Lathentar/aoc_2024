@@ -1,0 +1,32 @@
+ParsedData: type
+= {
+   // data members
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   std::cout << "Part Two: " << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   //solve_part2( parsed_data );
+}
+

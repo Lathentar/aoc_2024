@@ -1,0 +1,171 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+operator+ : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
+ParsedData: type = {
+   // data members   
+   public grid: std::vector<std::vector<char>> = ();
+   public moves: std::vector<char> = ();
+   public start_pt : Point = Point(0, 0);
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            if ch == '@' {
+               start_pt = Point( grid.back().ssize(), grid.ssize() - 1 );
+            }
+            grid.back().push_back(ch);
+         }
+      }
+
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         for line do (ch) {
+            moves.push_back(ch);
+         }
+      }
+   }
+}
+
+recurse_move: (inout grid : std::vector<std::vector<char>>, pos : Point, delta : Point) -> bool = {
+   tp := pos + delta;
+   ch := grid[ tp.y ][ tp.x ];
+   ret := true;
+
+   if ch == '#' {
+      // Hit a wall, stop moving
+      ret = false;
+   }
+   else if ch == '.' {
+      ret = true;
+   }
+   else if ch == 'O' {
+      ret = recurse_move( grid, tp, delta );
+   }
+   else if ch == '[' || ch == ']' {
+      if delta.y == 0 {
+         ret = recurse_move( grid, tp, delta );
+      }
+      else if ch == '[' {
+         ret = recurse_move( grid, tp, delta ) && recurse_move( grid, Point( tp.x + 1, tp.y ), delta );
+      }
+      else if ch == ']' {
+         ret = recurse_move( grid, tp, delta ) && recurse_move( grid, Point( tp.x - 1, tp.y ), delta );
+      }
+   }
+
+   if ret {
+      std::swap( grid[ tp.y ][ tp.x ], grid[ pos.y ][ pos.x ] );
+   }
+
+   return ret;
+}
+
+step_sim: (inout grid : std::vector<std::vector<char>>, move_ch : char, pos : Point) -> Point 
+   pre( 0 <= pos.y < grid.ssize() )
+   pre( 0 <= pos.x < grid.back().ssize() )
+   pre( grid[pos.y][pos.x] == '@' )
+= {
+   delta := Point(0, 0);
+   if move_ch == '>' {
+      delta = Point(1, 0);
+   } 
+   else if move_ch == '^' {
+      delta = Point(0, -1);
+   } 
+   else if move_ch == '<' {
+      delta = Point(-1, 0);
+   }
+   else if move_ch == 'v' {
+      delta = Point(0, 1);
+   }
+
+   tgrid := grid; // Copy over the grid as we're making changes!
+   if recurse_move( tgrid, pos, delta ) {
+      grid = tgrid;
+      return pos + delta;
+   }
+
+   return pos;
+}
+
+score_grid: (grid : std::vector<std::vector<char>>) -> i64 = {
+   score : i64 = 0;
+   y : i64 = 0;
+   while y < grid.ssize() next y++ {
+      x : i64 = 0;
+      while x < grid.back().ssize() next x++ {
+         if grid[ y ][ x ] == 'O' || grid[y][x] == '[' {
+            score += 100 * y + x;
+         }
+      }
+   }
+   return score;
+}
+
+double_wide_grid: (grid: std::vector<std::vector<char>>) -> std::vector<std::vector<char>> = {
+   wgrid := std::vector<std::vector<char>>();
+   for grid do (line) {
+      wgrid.push_back(std::vector<char>());
+      for line do (ch) {
+         if ch == 'O' {
+            wgrid.back().push_back('[');
+            wgrid.back().push_back(']');
+         }
+         else if ch == '@' {
+            wgrid.back().push_back(ch);
+            wgrid.back().push_back('.');
+         }
+         else {
+            wgrid.back().push_back(ch);
+            wgrid.back().push_back(ch);
+         }
+      }
+   }
+   return wgrid;
+}
+
+solve_part1: (data: ParsedData) = {
+   grid := data.grid;
+   pos := data.start_pt;
+   for data.moves do (m) {
+      pos = step_sim( grid, m, pos );
+   }
+   std::cout << "Part One: " << score_grid( grid ) << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   grid := double_wide_grid( data.grid );
+   pos := Point( data.start_pt.x * 2, data.start_pt.y );
+   for data.moves do (m) {
+      pos = step_sim( grid, m, pos );
+   }
+   std::cout << "Part Two: " << score_grid( grid ) << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

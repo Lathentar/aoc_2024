@@ -1,0 +1,306 @@
+GateType: @enum type = {
+   And;
+   Or;
+   Xor;
+
+   evaluate: (this, inputA: bool, inputB : bool) -> bool = {
+      if this == And {
+         return inputA && inputB;
+      }
+      else if this == Or {
+         return inputA || inputB;
+      }
+      else if this == Xor{
+         return inputA ^ inputB;
+      }
+
+      return false;
+   }
+}
+
+Gate: @value type = {
+   public inputA: std::string = ();
+   public inputB: std::string = ();
+   public output: std::string = ();
+   public gateType: GateType = GateType::And;
+
+   print: (this) = {
+      std::cout << "Gate = (inputA)$ " << gateType.to_string() << " (inputB)$ = (output)$" << std::endl;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   public wires : std::map<std::string, bool> = ();
+   public gates : std::vector<Gate> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+
+      // read the wires
+      while getline( inputStream, line ) && !line.empty() {
+         name : std::string = line.substr(0, 3);
+         value : bool = line.back() == '1';
+         wires[name] = value;
+      }
+
+      // read the gates
+      while inputStream.good() {
+         gateName := std::string();
+         arrow := std::string();
+
+         gate := Gate();
+         inputStream >> gate.inputA >> gateName >> gate.inputB >> arrow >> gate.output;
+
+         if gate.inputA.empty() {
+            break;
+         }
+
+         _ = arrow;  // throw away
+         
+         if gateName == "AND" {
+            gate.gateType = GateType::And;
+         }
+         if gateName == "OR" {
+            gate.gateType = GateType::Or;
+         }
+         if gateName == "XOR" {
+            gate.gateType = GateType::Xor;
+         }
+
+         gates.push_back( gate );
+      }
+   }
+}
+
+get_remapped_wire: (wire: std::string, remap_wires : std::map<std::string, std::string>) -> std::string = {
+   remap := wire;
+   if remap_wires.contains( wire ) {
+      remap = remap_wires.at( wire );  // Why didn't [] operators work here?
+   }
+
+   return remap;
+}
+
+sim_computer: (initial_wires : std::map<std::string, bool>, all_gates : std::vector<Gate>, remap_wires: std::map<std::string, std::string>) -> i64 = {
+   wires := initial_wires;
+   gates := all_gates;
+
+   while !gates.empty() {
+      remaining_gates := std::vector<Gate>();
+
+      gate_size := gates.ssize();
+      for gates do (g) {
+         inputA := g.inputA;
+         inputB := g.inputB;
+
+         if wires.contains( inputA ) && wires.contains( inputB ) {
+            output := get_remapped_wire( g.output, remap_wires );
+            wires[ output ] = g.gateType.evaluate( wires[ inputA ], wires[ inputB ] );
+         }
+         else {
+            remaining_gates.push_back(g);
+         }
+      }
+
+      gates = remaining_gates;
+      if gate_size == gates.ssize() {
+         // Invalid swap
+         return -1;
+      }
+   }
+   
+   // All gates evaluates, find all the wires
+   result : i64 = 0;
+   for wires do (w) {
+      if w.second && w.first[0] == 'z' {
+         bit := std::stoll(w.first.substr(1));
+         result = result | (1ll << bit);
+      }
+   }
+   return result;
+}
+
+evaluate_computer: (data: ParsedData)->i64 = {
+   wires := data.wires;
+   remap_wires := std::map<std::string, std::string>();
+   result := sim_computer( wires, data.gates, remap_wires );
+   return result;
+}
+
+set_wires: (inout wires : std::map<std::string, bool>, x : i64, y : i64) = {
+   {
+      bit := 0;
+      val := x;
+      while bit < 64 next ( val /= 2, bit++ ) {
+         wirename : std::string = "x";
+         wirename += '0' + bit / 10;
+         wirename += '0' + bit % 10;
+         if wires.contains( wirename ) {
+            wires[wirename] = val & 1;
+         }
+      }
+   }
+
+   {
+      bit := 0;
+      val := y;
+      while bit < 64 next ( val /= 2, bit++ ) {
+         wirename : std::string = "y";
+         wirename += '0' + bit / 10;
+         wirename += '0' + bit % 10;
+         if wires.contains( wirename ) {
+            wires[wirename] = val & 1;
+         }
+      }
+   }
+}
+
+get_impacting_wires_forward: (gates: std::vector<Gate>, wire: std::string, print: bool)->std::set<std::string> = {
+   output := std::set<std::string>();
+   for gates do (g) {
+      if g.inputA == wire || g.inputB == wire {
+         if print {
+            g.print();
+         }
+         output.insert( g.output );
+         output.insert_range( get_impacting_wires_forward( gates, g.output, print ) );
+      }
+   }
+   return output;
+}
+
+get_impacting_wires_backward: (gates: std::vector<Gate>, wire: std::string) -> std::set<std::string> = {
+   output := std::set<std::string>();
+   for gates do (g) {
+      if g.output == wire {
+         output.insert( g.inputA );
+         output.insert_range( get_impacting_wires_backward( gates, g.inputA ) );
+         output.insert( g.inputB );
+         output.insert_range( get_impacting_wires_backward( gates, g.inputB ) );
+      }
+   }
+   return output;
+}
+
+find_good_remap: (data: ParsedData, remaps: std::map<std::string, std::string>, potential_remaps : std::vector<std::vector<std::pair<std::string, std::string>>>)->std::string = {
+   idx := remaps.ssize() / 2;
+   if idx == potential_remaps.ssize() {
+      x := (1ll << 44) / 3;   // Randomly chosen number
+      y := (1ll << 44) - 1;
+      wires := data.wires;
+      set_wires( wires, x, y );
+      result := sim_computer( wires, data.gates, remaps );
+      expected_result := (x + y);
+      if result == expected_result {
+         output := std::string();
+         for remaps do (r) {
+            output += r.first + ",";
+         }
+         //std::cout << "Valid remap: (output)$" << std::endl;
+         return output;
+      }
+   }
+   else {
+      for potential_remaps[ idx ] do (r) {
+         test_remaps := remaps;
+         test_remaps[r.first] = r.second;
+         test_remaps[r.second] = r.first;
+         output := find_good_remap( data, test_remaps, potential_remaps );
+         if output != "" {
+            return output;
+         }
+      }
+   }
+
+   return "";
+}
+
+fix_computer: (data: ParsedData)->std::string = {
+   gates := data.gates;
+   potential_remapped_wires := std::vector<std::vector<std::pair<std::string, std::string>>>();
+
+   wire_deps := std::map<std::string, std::set<std::string>>();
+   for gates do (g) {
+      wire_deps[g.output] = get_impacting_wires_forward(gates, g.output, false);
+   }
+
+   for 0 ..= 44 do (bit) {
+      if potential_remapped_wires.empty() || !potential_remapped_wires.back().empty() {
+         potential_remapped_wires.push_back( std::vector<std::pair<std::string, std::string>>() );
+      }
+
+      x : i64 = (1ll << bit);
+      y : i64 = 0;
+
+      no_remapped_wires := std::map<std::string, std::string>();
+      wires := data.wires;
+      set_wires( wires, x, y );
+      result := sim_computer( wires, gates, no_remapped_wires );
+      expected_result := (x + y);
+      if result != expected_result {
+         //std::cout << "Bad result: x (x)$ + y (y)$ != (result)$ " << std::endl;
+
+         wirename : std::string = "x";
+         if x == 0 {
+            wirename = "y";
+         }
+         wirename += '0' + bit / 10;
+         wirename += '0' + bit % 10;
+         impacted_wires : std::set<std::string> = get_impacting_wires_forward( gates, wirename, false );
+
+         for impacted_wires do (l) {
+            for gates do (g) {
+               r := g.output;
+               if l < r && !wire_deps[l].contains(r) && !wire_deps[r].contains(l) {
+                  test_remap_wires := no_remapped_wires;
+                  test_remap_wires[l] = r;
+                  test_remap_wires[r] = l;
+
+                  wires := data.wires;
+                  set_wires( wires, x, y );
+                  result := sim_computer( wires, gates, test_remap_wires );
+                  if result == expected_result {
+                     //std::cout << "Found Good Swap = x (x)$ y (y)$ - swap '(l)$' '(r)$'" << std::endl;
+                     potential_remapped_wires.back().push_back(std::pair(l, r));
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   // Remove a potential empty category
+   if potential_remapped_wires.back().empty() {
+      potential_remapped_wires.pop_back();
+   }
+   
+   no_remapped_wires := std::map<std::string, std::string>();
+   output := find_good_remap( data, no_remapped_wires, potential_remapped_wires );
+   return output;
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << evaluate_computer(data) << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   output := fix_computer(data);
+   std::cout << "Part Two: " << output << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

@@ -1,0 +1,176 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+operator+ : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
+operator- : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x - rhs.x, lhs.y - rhs.y);
+}
+
+ParsedData: type = {
+   // data members   
+   public grid: std::vector<std::vector<char>> = ();
+   public start_pt : Point = Point(0, 0);
+   public end_pt : Point = Point(0, 0);
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            if ch == 'S' {
+               start_pt = Point( grid.back().ssize(), grid.ssize() - 1 );
+            }
+            else if ch == 'E' {
+               end_pt = Point( grid.back().ssize(), grid.ssize() - 1 );
+            }
+            grid.back().push_back(ch);
+         }
+      }
+   }
+}
+
+Node: @value type = {
+   public point: Point = Point(0, 0);
+   public steps: i64 = 0;
+
+   operator=: (out this, p: Point, s : i64) = {
+      point = p;
+      steps = s;
+   }
+      
+   operator< : (this, that) -> bool = {
+      return steps > that.steps;
+   }
+}
+
+print_grid: (grid : std::vector<std::vector<char>>) = {
+   for grid do (line) {
+      for line do (ch) {
+         std::cout << ch;
+      }
+      std::cout << std::endl;
+   }
+   std::cout << std::endl;
+}
+
+is_valid_element: (grid: std::vector<std::vector<char>>, pt : Point) -> bool = {
+   if 0 <= pt.y < grid.ssize() && 0 <= pt.x < grid.back().ssize() {
+      return grid[pt.y][pt.x] != '#';
+   }
+   return false;
+}
+
+visit_grid: (start: Point, end: Point, grid: std::vector<std::vector<char>>) -> std::map<Point, i64> = {
+   visited_map := std::map<Point, i64>();
+   to_visit := std::priority_queue<Node>();
+   
+   to_visit.push( Node( start, 0 ) );
+   while !to_visit.empty() {
+      n := to_visit.top();
+      to_visit.pop();
+
+      if visited_map.contains( n.point ) && visited_map[ n.point ] <= n.steps {
+         // Got here in less steps
+         continue;
+      }
+      else {
+         // Got here first or in less steps
+         visited_map[ n.point ] = n.steps;
+      }
+
+      // reached end point, no need to continue
+      if n.point == end {
+         break;
+      }
+
+      dirs : std::array<Point, 4> = ( Point(-1, 0), Point(1, 0), Point(0, -1), Point(0, 1) );
+      for dirs do (d) {
+         if is_valid_element( grid, n.point + d ) {
+            to_visit.push( Node( n.point + d, n.steps + 1 ) );
+         }
+      }
+   }
+   return visited_map;
+}
+
+cheat_grid: (start: Point, end: Point, grid: std::vector<std::vector<char>>, time: i64, threshold: i64) -> std::map<std::pair<Point, Point>, i64> = {
+   end_to_node := visit_grid( end, start, grid );
+
+   // Now that we've visited the map, search for walls to cheat through
+   cheat_map := std::map<std::pair<Point, Point>, i64>();
+   pt := Point(1, 1);
+   while pt.y < grid.ssize() - 1 next (pt.y++, pt.x = 1) {
+      while pt.x < grid.back().ssize() - 1 next pt.x++ {
+         if grid[ pt.y ][ pt.x ] != '#' {
+            offset := Point( -time, -time );
+            while offset.y <= time next offset.y++ {
+               offset.x = -time;
+               while offset.x <= time next offset.x++ {
+                  man_dist := std::abs( offset.x ) + std::abs( offset.y );
+                  if man_dist <= time {
+                     // This is a valid cheat
+                     cheat_sp := pt;
+                     cheat_ep := pt + offset;
+
+                     if !end_to_node.contains( cheat_sp ) || !end_to_node.contains( cheat_ep ) {
+                        continue;
+                     }
+
+                     steps_remaining := end_to_node[cheat_sp];
+                     steps_remaining_cheat := end_to_node[cheat_ep];
+                     
+                     no_cheat := steps_remaining;
+                     with_cheat := steps_remaining_cheat + man_dist;
+                     savings := no_cheat - with_cheat;
+
+                     if savings >= threshold {
+                        cheat_map[std::pair(cheat_sp, cheat_ep)] = savings;
+                        //std::cout << "Saving (cheat_sp.x)$, (cheat_sp.y)$ -> ((cheat_ep.x)$, (cheat_ep.y)$) = (savings)$" << std::endl;
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return cheat_map;
+}
+
+solve_part1: (data: ParsedData) = {
+   cheats := cheat_grid( data.start_pt, data.end_pt, data.grid, 2, 100 );
+   sum := cheats.ssize();
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   cheats := cheat_grid( data.start_pt, data.end_pt, data.grid, 20, 100 );
+   sum := cheats.ssize();
+   std::cout << "Part Two: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

@@ -1,0 +1,79 @@
+ParsedData: type = {
+   // data members
+   public patterns : std::vector<std::string> = ();
+   public linens : std::vector<std::string> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      getline( inputStream, line );
+
+      pos : size_t = 0;
+      while true {
+         epos := line.find(",", pos);
+         patterns.push_back( line.substr( pos, epos - pos ) );
+         pos = epos;
+         if pos == std::string::npos {
+            break;
+         }
+         pos += 2;   // skip comma and space
+      }
+
+      getline( inputStream, line ); // empty line
+      while getline( inputStream, line ) && !line.empty() {
+         linens.push_back( line );
+      }
+   }
+}
+
+ways_to_make_linen: (linen: std::string_view, patterns: std::vector<std::string>) -> i64 = {
+   linen_results := std::map<std::string_view, i64>();
+
+   i := 1;
+   while i <= linen.ssize() next i++ {
+      linen_sub := linen.substr(linen.ssize() - i);
+      for patterns do (p) {
+         if linen_sub.starts_with( p ) {
+            amount : i64 = 1;
+
+            if linen_sub.ssize() != p.ssize() {
+               linen_remain := linen_sub.substr( p.ssize() );
+               amount = linen_results[linen_remain];
+            }
+
+            linen_results[linen_sub] += amount;
+         }
+      }
+   }
+
+   ways := linen_results[linen]; 
+   return ways;
+}
+
+solve_part1: (data: ParsedData) = {
+   sum := std::ranges::count_if( data.linens, :(l) = ways_to_make_linen( l, data.patterns$ ) > 0 );
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.linens do (l) {
+      sum += ways_to_make_linen( l, data.patterns );
+   }
+   std::cout << "Part Two: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

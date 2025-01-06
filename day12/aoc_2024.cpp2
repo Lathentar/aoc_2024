@@ -1,0 +1,175 @@
+Point: @value type = {
+   public x : i64 = 0;
+   public y : i64 = 0;
+
+   operator=: (out this, _x: i64, _y: i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+ParsedData: type = {
+   // data members   
+   public grid: std::vector<std::vector<char>> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            grid.back().push_back(ch);
+         }
+      }
+   }
+}
+
+get_element: (grid: std::vector<std::vector<char>>, pt: Point) -> char = {
+   if 0 <= pt.y < grid.ssize() && 0 <= pt.x < grid.back().ssize() {
+      return grid[pt.y][pt.x];
+   }
+
+   return '.';
+}
+
+find_patch: (grid: std::vector<std::vector<char>>, pt: Point, ch: char, inout elements: std::vector<Point>) = {
+   if get_element( grid, pt ) == ch {
+      if std::find( elements.begin(), elements.end(), pt ) == elements.end() {
+         elements.push_back( pt );
+
+         find_patch( grid, Point( pt.x + 1, pt.y ), ch, elements );
+         find_patch( grid, Point( pt.x - 1, pt.y ), ch, elements );
+         find_patch( grid, Point( pt.x, pt.y + 1 ), ch, elements );
+         find_patch( grid, Point( pt.x, pt.y - 1 ), ch, elements );
+      }
+   }
+}
+
+get_patch_perimeter: ( grid: std::vector<std::vector<char>>, ch: char, elements: std::vector<Point> ) -> i64 = {
+   perimeter := 0;
+   for elements do (pt) {
+      if get_element( grid, Point( pt.x - 1, pt.y ) ) != ch {
+         perimeter++;
+      }
+      if get_element( grid, Point( pt.x + 1, pt.y ) ) != ch {
+         perimeter++;
+      }
+      if get_element( grid, Point( pt.x, pt.y - 1 ) ) != ch {
+         perimeter++;
+      }
+      if get_element( grid, Point( pt.x, pt.y + 1 ) ) != ch {
+         perimeter++;
+      }
+   }
+   return perimeter;
+}
+
+get_patch_perimeter_score: (grid: std::vector<std::vector<char>>, ch : char, elements : std::vector<Point>) -> i64 = {
+   perimeter := get_patch_perimeter( grid, ch, elements );
+   score := perimeter * elements.ssize();
+   return score;
+}
+
+get_patch_sides: ( grid: std::vector<std::vector<char>>, ch: char, elements: std::vector<Point> ) -> i64 = {
+   sides := 0;
+   minPt := Point(grid.back().ssize(), grid.ssize());
+   maxPt := Point(0, 0);
+   for elements do (pt) {
+      minPt.x = std::min( minPt.x, pt.x );
+      minPt.y = std::min( minPt.y, pt.y );
+      maxPt.x = std::max( maxPt.x, pt.x );
+      maxPt.y = std::max( maxPt.y, pt.y );
+   }
+
+   dirs : std::array<Point, 4> = ( Point( 0, -1 ), Point( 0, 1 ), Point( -1, 0 ), Point( 1, 0 ) );
+   for dirs do (dir) {
+      pt: = minPt;
+      while pt.y <= maxPt.y next pt.y++ {
+         pt.x = minPt.x;
+         found_side: = false;
+         while pt.x <= maxPt.x next pt.x++ {
+            if get_element( grid, pt ) == ch && 
+               get_element( grid, Point( pt.x + dir.x, pt.y + dir.y ) ) != ch && 
+               std::find( elements.begin(), elements.end(), pt ) != elements.end() {
+               if found_side == false {
+                  sides += 1;
+                  found_side = true;
+               }
+            }
+            else {
+               found_side = false;
+            }
+         }
+      }
+   }
+
+   return sides;
+}
+
+get_patch_side_score: (grid: std::vector<std::vector<char>>, ch : char, elements : std::vector<Point>) -> i64 = {
+   sides := get_patch_sides( grid, ch, elements );
+   num := elements.ssize();
+   score := sides * elements.ssize();
+   //std::cout << "A region of (ch)$ plants with price (num)$ * (sides)$ = (score)$" << std::endl;
+   return score;
+}
+
+clear_patch: (inout grid: std::vector<std::vector<char>>, elements: std::vector<Point>) = {
+   for elements do (pt) {
+      grid[pt.y][pt.x] = '.';
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+
+   grid := data.grid;
+   pt := Point(0, 0);
+   for grid next (pt.y++, pt.x = 0) do (line) {
+      for line next pt.x++ do (ch) {
+         ch := get_element( grid, pt );
+         if ch != '.' {
+            elements := std::vector<Point>();
+            find_patch( grid, pt, ch, elements );
+            sum += get_patch_perimeter_score( grid, ch, elements );
+            clear_patch( grid, elements );
+         }
+      }
+   }
+
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+
+   grid := data.grid;
+   pt := Point(0, 0);
+   for grid next (pt.y++, pt.x = 0) do (line) {
+      for line next pt.x++ do (ch) {
+         ch := get_element( grid, pt );
+         if ch != '.' {
+            elements := std::vector<Point>();
+            find_patch( grid, pt, ch, elements );
+            sum += get_patch_side_score( grid, ch, elements );
+            clear_patch( grid, elements );
+         }
+      }
+   }
+   std::cout << "Part Two: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

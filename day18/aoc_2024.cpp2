@@ -1,0 +1,157 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+operator+ : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
+ParsedData: type = {
+   // data members
+   public points : std::vector<Point> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while getline( inputStream, line ) && !line.empty() {
+         x := std::stoll( line );
+         y := std::stoll( line.substr( line.find(",") + 1 ) );
+         points.push_back( Point( x, y ) );
+      }
+   }
+}
+
+build_grid: (dim: Point, points)->std::vector<std::vector<char>> = {
+   grid := std::vector<std::vector<char>>();
+   y := 0;
+   while y < dim.y next y++ {
+      grid.push_back( std::vector<char>() );
+      x := 0;
+      while x < dim.x next x++ {
+         grid.back().push_back('.');
+      }
+   }
+   for points do (p) {
+      grid[p.y][p.x] = '#';
+   }
+   return grid;
+}
+
+Node: @value type = {
+   public point: Point = Point(0, 0);
+   public steps: i64 = 0;
+
+   operator=: (out this, p: Point, s : i64) = {
+      point = p;
+      steps = s;
+   }
+      
+   operator< : (this, that) -> bool = {
+      return steps > that.steps;
+   }
+}
+
+print_grid: (grid : std::vector<std::vector<char>>) = {
+   for grid do (line) {
+      for line do (ch) {
+         std::cout << ch;
+      }
+      std::cout << std::endl;
+   }
+   std::cout << std::endl;
+}
+
+is_valid_element: (grid: std::vector<std::vector<char>>, pt : Point) -> bool = {
+   if 0 <= pt.y < grid.ssize() && 0 <= pt.x < grid.back().ssize() {
+      return grid[pt.y][pt.x] == '.';
+   }
+   return false;
+}
+
+solve_grid: (start: Point, end: Point, grid : std::vector<std::vector<char>>) -> i64 = {
+   visited_map := std::map<Point, i64>();
+   to_visit := std::priority_queue<Node>();
+   
+   to_visit.push( Node( start, 0 ) );
+   while !to_visit.empty() {
+      n := to_visit.top();
+      to_visit.pop();
+
+      if visited_map.contains( n.point ) && visited_map[ n.point ] <= n.steps {
+         // Got here in less steps
+         continue;
+      }
+      else {
+         // Got here first or in less steps
+         visited_map[ n.point ] = n.steps;
+      }
+
+      // reached end point, no need to continue
+      if n.point == end {
+         break;
+      }
+
+      dirs : std::array<Point, 4> = ( Point(-1, 0), Point(1, 0), Point(0, -1), Point(0, 1) );
+      for dirs do (d) {
+         if is_valid_element( grid, n.point + d ) {
+            to_visit.push( Node( n.point + d, n.steps + 1 ) );
+         }
+      }
+   }
+
+   if visited_map.contains( end ) {
+      return visited_map[ end ];
+   }
+   else {
+      return -1;
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   grid := build_grid( Point(71, 71), std::views::take( data.points, 1024 ) );
+   //grid := build_grid( Point(7, 7), std::views::take( data.points, 12 ) );
+   steps := solve_grid( Point(0, 0), Point(grid.back().ssize() - 1, grid.ssize() - 1), grid);
+   std::cout << "Part One: (steps)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   min : i64 = 1024;
+   max : i64 = data.points.ssize() - 1;
+
+   while min != max {
+      test := min + (max - min + 1) / 2;
+      grid := build_grid( Point(71, 71), std::views::take( data.points, test ) );
+      //grid := build_grid( Point(7, 7), std::views::take( data.points, test ) );
+      steps := solve_grid( Point(0, 0), Point(grid.back().ssize() - 1, grid.ssize() - 1), grid);
+      if steps == -1 {
+         max = test - 1;
+      }
+      else {
+         min = test;
+      }
+   }
+
+   pt := data.points[min];
+   std::cout << "Part Two: " << pt.x << "," << pt.y << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

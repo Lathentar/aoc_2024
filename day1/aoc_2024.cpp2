@@ -1,0 +1,58 @@
+main: (args) = {
+   // Boiler plate code, I'm passing in input.txt as my parameter
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   // Put the file into an input stream
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+
+   // Parse the data, this will be passed into both parts
+   parsed_data : ParsedData = fileStream;
+
+   // All AoC problems have two parts using the same data
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+
+ParsedData: type = {
+   // data members
+   public lhs: std::vector<i32> = ();
+   public rhs: std::vector<i32> = ();
+
+   operator=: (out this, move inputStream: std::istream) = {
+      // Read two columns of ints
+      while ( inputStream.good() ) {
+         l := 0;
+         r := 0;
+         inputStream >> l >> r;
+         lhs.push_back( l );
+         rhs.push_back( r );
+      }
+
+      // Both problems require sorted columns, so do it once here
+      std::ranges::sort(lhs);
+      std::ranges::sort(rhs);      
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   // Sum of the absolute difference between the left and right column
+   sum := 0;
+   for std::views::zip( data.lhs, data.rhs ) do (elem) {
+      diff := abs( std::get<0>(elem) - std::get<1>(elem) );
+      sum += diff;
+   }
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.lhs do (l) {
+      count := std::ranges::count( data.rhs, l );
+      sum += l * count;
+   }
+   std::cout << "Part Two: " << sum << std::endl;
+}

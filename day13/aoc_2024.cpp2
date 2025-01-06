@@ -1,0 +1,98 @@
+Puzzle: @value type = {
+   public ax : i64 = 0;
+   public ay : i64 = 0;
+   public bx : i64 = 0;
+   public by : i64 = 0;
+   public px : i64 = 0;
+   public py : i64 = 0;
+
+   operator=: (out this, inout inputStream: std::istream) = {
+      aline := std::string();
+      bline := std::string();
+      pline := std::string();
+      std::getline( inputStream, aline );
+      ax = std::stoll( aline.substr( aline.find("X+") + 2 ) );
+      ay = std::stoll( aline.substr( aline.find("Y+") + 2 ) );
+      std::getline( inputStream, bline );
+      bx = std::stoll( bline.substr( bline.find("X+") + 2 ) );
+      by = std::stoll( bline.substr( bline.find("Y+") + 2 ) );
+      std::getline( inputStream, pline );
+      px = std::stoll( pline.substr( pline.find("X=") + 2 ) );
+      py = std::stoll( pline.substr( pline.find("Y=") + 2 ) );
+   }
+
+   solve: (this, offset: i64) -> i64 = {
+      fx := px + offset;
+      fy := py + offset;
+
+      // Cramer's Rule
+      // ax * i + bx * j = fx
+      // ay * i + by * j = fy
+      // detD = | ax bx |
+      //        | ay by |
+      detD : i64 = ax * by - bx * ay;
+      // detI = | fx bx |
+      //        | fy by |
+      detI : i64 = fx * by - fy * bx;
+      // detJ = | ax fx |
+      //        | ay fy |
+      detJ : i64 = ax * fy - ay * fx;
+      // i = detI / detD
+      // j = detJ / detD
+      if detI % detD == 0 && detJ % detD == 0 {
+         i : i64 = detI / detD;
+         j : i64 = detJ / detD;
+         ret : i64 = i * 3 + j;
+         //std::cout << "Puzzle (i)$, (j)$ = (ret)$" << std::endl;
+         return i * 3 + j;
+      }
+
+      //std::cout << "Puzzle No Solution" << std::endl;
+      return 0;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   public puzzles : std::vector<Puzzle> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      do {
+         puzzles.emplace_back( inputStream );         
+      } while ( std::getline( inputStream, line ) );
+   }
+
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.puzzles do (p) {
+      sum += p.solve(0);
+   }
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.puzzles do (p) {
+      sum += p.solve(10000000000000);
+   }
+   std::cout << "Part Two: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

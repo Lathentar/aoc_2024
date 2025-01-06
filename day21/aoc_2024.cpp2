@@ -1,0 +1,257 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+operator+ : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
+operator- : (lhs: Point, rhs: Point) -> Point = {
+   return Point(lhs.x - rhs.x, lhs.y - rhs.y);
+}
+
+Move: @enum type = {
+   Up;
+   Down;
+   Left;
+   Right;
+   Activate;
+
+   dpad_position: (this) -> Point = {
+      if this == Move::Up {
+         return Point(1, 0);
+      }
+      if this == Move::Down {
+         return Point(1, 1);
+      }
+      if this == Move::Left {
+         return Point(0, 1);
+      }
+      if this == Move::Right {
+         return Point(2, 1);
+      }
+      if this == Move::Activate {
+         return Point(2, 0);
+      }
+
+      return Point(-1, -1);
+   }
+
+   move_for_char: (ch: char)->std::optional<Move> = {
+      m := std::optional<Move>();
+      if ch == '<' {
+         m = Move::Left;
+      }
+      else if ch == '>' {
+         m = Move::Right;
+      }
+      else if ch == '^' {
+         m = Move::Up;
+      }
+      else if ch == 'V' {
+         m = Move::Down;
+      }
+      else if ch == 'A' {
+         m = Move::Activate;
+      }
+
+      return m;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   public inputs : std::vector<std::string> = std::vector<std::string>();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while getline( inputStream, line ) && !line.empty() {
+         inputs.push_back( line );
+      }
+   }
+}
+
+numpad_position: (ch: char) -> Point = {
+   if ch == '7' {
+      return Point(0, 0);
+   }
+   if ch == '8' {
+      return Point(1, 0);
+   }
+   if ch == '9' {
+      return Point(2, 0);
+   }
+   if ch == '4' {
+      return Point(0, 1);
+   }
+   if ch == '5' {
+      return Point(1, 1);
+   }
+   if ch == '6' {
+      return Point(2, 1);
+   }
+   if ch == '1' {
+      return Point(0, 2);
+   }
+   if ch == '2' {
+      return Point(1, 2);
+   }
+   if ch == '3' {
+      return Point(2, 2);
+   }
+   if ch == '0' {
+      return Point(1, 3);
+   }
+   if ch == 'A' {
+      return Point(2, 3);
+   }
+
+   return Point(-1, -1);
+}
+
+CacheEntry: @value type = {
+   public start : Point = Point(0, 0);
+   public end : Point = Point(0, 0);
+   public depth : i64 = 0;
+
+   operator=: (out this, s: Point, e: Point, d: i64) = {
+      start = s;
+      end = e;
+      depth = d;
+   }
+}
+
+PartialMove: @value type = {
+   public position : Point = Point(0, 0);
+   public sequence : std::string = ();
+   
+   operator=: (out this, p: Point, s: std::string) = {
+      position = p;
+      sequence = s;
+   }
+}
+
+generateSequence: (inout cache : std::map< CacheEntry, i64 >, startPosition : Point, gapPosition : Point, sequence : std::string, depth : i64, maxDepth : i64)->i64 = {
+   if depth < 0 {
+      return sequence.ssize();
+   }
+
+   sequenceLength : i64 = 0;
+
+   currentPosition : Point = startPosition;
+   for sequence do (c)
+   {
+      nextPosition := Point(0, 0);
+      if depth == maxDepth {
+         nextPosition = numpad_position(c);
+      }
+      else {
+         nextPosition = Move::move_for_char(c)*.dpad_position();
+      }
+
+      testEntry := CacheEntry( currentPosition, nextPosition, depth );
+
+      if cache.contains( testEntry ) {
+         sequenceLength += cache[ testEntry ];
+         currentPosition = nextPosition;
+         continue;
+      }
+
+      // generate all possible moves
+      stack := std::vector<PartialMove>();
+      stack.push_back( PartialMove( currentPosition, std::string() ));
+
+      bestLength : i64 = std::numeric_limits<i64>::max();
+
+      while !stack.empty() {
+         currentMove : PartialMove = stack.back();
+         stack.pop_back();
+
+         // mind the gap
+         if currentMove.position == gapPosition {
+            continue;
+         }
+
+         // hit the target position, test to see if it has a smaller overall sequence length
+         if currentMove.position == nextPosition {
+            testLength := generateSequence(cache, Point( 2, 0 ), Point( 0, 0 ), currentMove.sequence + 'A', depth - 1, maxDepth);
+            bestLength = std::min(testLength, bestLength);
+         }
+
+         delta := nextPosition - currentMove.position;
+
+         if delta.x < 0 {
+            pm := PartialMove(currentMove.position + Point( -1, 0 ), currentMove.sequence + '<');
+            stack.push_back( pm );
+         }
+         if delta.x > 0 {
+            pm := PartialMove( currentMove.position + Point( 1, 0 ), currentMove.sequence + '>' );
+            stack.push_back( pm );
+         }
+         if delta.y < 0 {
+            pm := PartialMove( currentMove.position + Point( 0, -1 ), currentMove.sequence + '^' );
+            stack.push_back( pm );
+         }
+         if delta.y > 0 {
+            pm := PartialMove( currentMove.position + Point( 0, 1 ), currentMove.sequence + 'V' );
+            stack.push_back(pm);
+         }
+      }
+
+      // update the cache
+      cache[testEntry] = bestLength;
+
+      sequenceLength += bestLength;
+      currentPosition = nextPosition;
+   }
+
+   return sequenceLength;
+}
+
+solve_input: (input: std::string, max_depth: i64)->i64 = {
+   cache := std::map< CacheEntry, i64 >();
+   len := generateSequence( cache, numpad_position('A'), Point(0, 3), input, max_depth, max_depth );
+   _ = cache;  // so cache isn't moved above
+   num := std::stoi(input);
+   ret := len * num;
+   //std::cout << "Input (input)$ - Depth (max_depth)$ - Len (len)$" << std::endl;
+   return ret;
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.inputs do (i) {
+      sum += solve_input( i, 2 );
+   }
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.inputs do (i) {
+      sum += solve_input( i, 25 );
+   }
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

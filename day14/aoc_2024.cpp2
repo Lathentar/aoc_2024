@@ -1,0 +1,156 @@
+Point: @value type = {
+   public x : i64 = 0;
+   public y : i64 = 0;
+
+   operator=: (out this, _x: i64, _y: i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+Robot: @value type = {
+   public pos : Point = Point(0, 0);
+   public velocity : Point = Point(0, 0);
+
+   operator=: (out this, start: Point, vel: Point) = {
+      pos = start;
+      velocity = vel;
+   }
+
+   simulate: (inout this, steps: i64, grid_size: Point) = {
+      start_pos := pos;
+
+      pos.x += velocity.x * steps;
+      pos.y += velocity.y * steps;
+
+      // Clamp to the grid
+      pos.x %= grid_size.x;
+      pos.y %= grid_size.y;
+
+      if pos.x < 0 {
+         pos.x += grid_size.x;
+      }
+      if pos.y < 0 {
+         pos.y += grid_size.y;
+      }
+   }
+
+   get_quadrant: (this, grid_size: Point) -> i32 = {
+      if pos.x < grid_size.x / 2 {
+         if pos.y < grid_size.y / 2 {
+            return 0;
+         }
+         
+         if pos.y > grid_size.y / 2 {
+            return 1;
+         }
+      }
+      else if pos.x > grid_size.x / 2 {
+         if pos.y < grid_size.y / 2 {
+            return 2;
+         }
+
+         if pos.y > grid_size.y / 2 {
+            return 3;
+         }
+      }
+
+      return 4;
+   }
+}
+
+print_robots: (robots: std::vector<Robot>, grid_size : Point) = {
+   pos := Point(0, 0);
+   while pos.y < grid_size.y next pos.y++ {
+      pos.x = 0;
+      while pos.x < grid_size.x next pos.x++ {
+         c := std::ranges::count_if( robots, :(r) = r.pos == pos$ );
+         if c == 0 {
+            std::cout << '.';
+         }
+         else {
+            std::cout << char('0' + c);
+         }
+      }
+      std::cout << std::endl;
+   }
+   std::cout << std::endl;
+}
+
+ParsedData: type = {
+   // data members
+   public robots : std::vector<Robot> = std::vector<Robot>();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      // p=0,4 v=3,-3
+      line := std::string();
+      while std::getline( inputStream, line ) {
+         start := Point(0, 0);
+         start.x = std::stoi( line.substr( line.find("=") + 1 ) );
+         start.y = std::stoi( line.substr( line.find(",") + 1 ) );
+         vel := Point(0, 0);
+         vel.x = std::stoi( line.substr( line.find_last_of("=") + 1 ) );
+         vel.y = std::stoi( line.substr( line.find_last_of(",") + 1 ) );
+         robots.push_back( Robot( start, vel ) );
+      }
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   robots := data.robots;
+   grid_size := Point(101, 103);//Point(11, 7);
+   quads : std::array<i64, 5> = (0, 0, 0, 0, 0);
+   for robots do (inout r) {
+      r.simulate(100, grid_size);
+      quads[r.get_quadrant(grid_size)] += 1;
+   }
+   sum := quads[0] * quads[1] * quads[2] * quads[3];
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   robots := data.robots;
+   grid_size := Point(101, 103);
+   best : i64 = 0;
+   best_i : i64 = 0;
+   i : i64 = 1;
+   while i <= (grid_size.x * grid_size.y) next i++ {
+      delta : i64 = 0;
+      for robots do (inout r) {
+         r.simulate(1, grid_size);
+      }
+
+      // Hope that the most "organized" grid is the correct one
+      for robots do (r) {
+         for robots do (b) {
+            delta += (r.pos.x - b.pos.x) * (r.pos.x - b.pos.x) + 
+                     (r.pos.y - b.pos.y) * (r.pos.y - b.pos.y);
+         }
+      }
+
+      if best == 0 || delta < best {
+         best = delta;
+         best_i = i;
+         //std::cout << "Run: (i)$ - (delta)$" << std::endl;
+         //print_robots( robots, grid_size );
+      }
+   }
+
+   std::cout << "Part Two: (best_i)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

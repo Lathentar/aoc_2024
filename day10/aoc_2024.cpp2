@@ -1,0 +1,82 @@
+ParsedData: type = {
+   // data members   
+   public grid: std::vector<std::vector<char>> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            grid.back().push_back(ch);
+         }
+      }
+   }
+
+   get_element: (this, x: i32, y : i32) -> char = {
+      if 0 <= y < grid.ssize() && 0 <= x < grid.back().ssize() {
+         return grid[y][x];
+      }
+
+      return '.';
+   }
+
+   search_trailheads: (this, x: i32, y: i32, ch: char, inout tops: std::vector<i64>, allow_dupes: bool) = {
+      if get_element(x, y) == ch {
+         if ch == '9' {
+            idx := y * grid.ssize() + x;
+            if allow_dupes || std::find( tops.begin(), tops.end(), idx ) == tops.end() {
+               tops.push_back( idx );
+            }
+         }
+         else {
+            search_trailheads(x - 1, y, ch + 1, tops, allow_dupes);
+            search_trailheads(x + 1, y, ch + 1, tops, allow_dupes);
+            search_trailheads(x, y - 1, ch + 1, tops, allow_dupes);
+            search_trailheads(x, y + 1, ch + 1, tops, allow_dupes);
+         }
+      }
+   }
+
+   count_trailheads: (this, allow_dupes: bool) -> i64 = {
+      sum : i64 = 0;
+
+      y := 0;
+      for grid next y++ do(row) {
+         x := 0;
+         for row next x++ do(ch) {
+            tops := std::vector<i64>();
+            search_trailheads(x, y, '0', tops, allow_dupes);
+            if !tops.empty() {
+               sum += tops.ssize();
+               //std::cout << "Trailheads - x " << x << " y " << y << " count " << tops.ssize() << std::endl;
+            }
+         }
+      }
+
+      return sum;
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << data.count_trailheads(false) << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   std::cout << "Part Two: " << data.count_trailheads(true) << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

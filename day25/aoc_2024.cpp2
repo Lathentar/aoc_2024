@@ -1,0 +1,77 @@
+ParsedData: type = {
+   // data members
+   public locks: std::vector<std::array<i8, 5>> = ();
+   public keys: std::vector<std::array<i8, 5>> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while inputStream.good() {
+         values : std::array<i8, 5> = (0, 0, 0, 0, 0);
+
+         inputStream >> line;
+         if line[ 0 ] == '.' {
+            // We're a key!
+            for 0 ..< 5 do (y) {
+               inputStream >> line;
+               for 0 ..< 5 do (x) {
+                  if line[x] == '#' {
+                     values[x] = std::max( values[x], i8( 5 - y ) );
+                  }
+               }
+            }
+            keys.push_back( values );
+         }
+         else {
+            // We're a lock
+            for 1 ..= 5 do (y) {
+               inputStream >> line;
+               for 0 ..< 5 do (x) {
+                  if line[x] == '#' {
+                     values[x] = std::max( values[x], i8( y ) );
+                  }
+               }
+            }
+            locks.push_back( values );
+         }
+
+         // Read the unneeded last line
+         inputStream >> line;
+      }
+   }
+}
+
+lock_fits_key: (lock: std::array<i8, 5>, key: std::array<i8, 5>) -> bool = {
+   for 0 ..< lock.ssize() do (x) {
+      if (lock[ x ] + key[ x ]) > 5 {
+         return false;
+      }
+   }
+   return true;
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.locks do (l) {
+      for data.keys do (k) {
+         if lock_fits_key( l, k ) {
+            sum += 1;
+         }
+      }
+   }
+   std::cout << "Part One: (sum)$" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+}
+

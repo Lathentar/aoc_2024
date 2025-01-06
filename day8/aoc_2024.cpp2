@@ -1,0 +1,124 @@
+Point: @value type = {
+   public x: i64 = 0;
+   public y: i64 = 0;
+
+   operator=: (out this, _x: i64, _y : i64) = {
+      x = _x;
+      y = _y;
+   }
+}
+
+ParsedData: type = {
+   // data members
+   public grid: std::vector<std::vector<char>> = ();
+   public char_map: std::vector<std::vector<Point>> = std::vector<std::vector<Point>>( 256, std::vector<Point>() );  // Why couldn't I use multimap here?
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while ( std::getline( inputStream, line ) && !line.empty() ) {
+         grid.push_back( std::vector<char>() );
+         for line do (ch) {
+            grid.back().push_back(ch);
+
+            if ( ch != '.' ) {
+               p := Point(grid.back().ssize() - 1, grid.ssize() - 1);
+               char_map[ch].push_back( p );
+            }
+         }
+      }
+   }
+
+   find_antinodes: (this, resonance: bool) -> std::set<Point> = {
+      antinodes := std::set<Point>();
+      for char_map do (points) {
+         if !points.empty() {
+            i := 0;
+            while i < points.ssize() next i++ {
+               j := i + 1;
+               while j < points.ssize() next j++ {
+                  ip := points[i];
+                  jp := points[j];
+
+                  dx := ip.x - jp.x;
+                  dy := ip.y - jp.y;
+
+                  if resonance {
+                     antinodes.insert( ip );
+
+                     ap := Point(ip.x + dx, ip.y + dy);
+                     while ( 0 <= ap.x < grid.back().ssize() && 0 <= ap.y < grid.ssize() ) {
+                        antinodes.insert( ap );
+                        ap.x += dx;
+                        ap.y += dy;
+                     }
+                     
+                     ap = Point(ip.x - dx, ip.y - dy);
+                     while ( 0 <= ap.x < grid.back().ssize() && 0 <= ap.y < grid.ssize() ) {
+                        antinodes.insert( ap );
+                        ap.x -= dx;
+                        ap.y -= dy;
+                     }
+                  }
+                  else {
+                     ap1 := Point(ip.x + dx, ip.y + dy);
+                     if ( 0 <= ap1.x < grid.back().ssize() && 0 <= ap1.y < grid.ssize() ) {
+                        antinodes.insert( ap1 );
+                     }
+
+                     ap2 := Point(jp.x - dx, jp.y - dy);
+                     if ( 0 <= ap2.x < grid.back().ssize() && 0 <= ap2.y < grid.ssize() ) {
+                        antinodes.insert( ap2 );
+                     }
+                  }
+               }
+            }
+         }
+      }
+      return antinodes;
+   }
+
+   print: (this, with_antinodes: bool, resonance: bool) = {
+      antinodes := std::set<Point>();
+      if with_antinodes {
+         antinodes = find_antinodes(resonance);
+      }
+
+      y := 0;
+      for grid next y++ do (line) {
+         x := 0;
+         for line next x++ do (ch) {
+            if ch == '.' && antinodes.contains(Point(x, y)) {
+               std::cout << '#';
+            }
+            else {
+               std::cout << ch;
+            }
+         }
+         std::cout << std::endl;
+      }
+   }
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << data.find_antinodes(false).ssize() << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   std::cout << "Part One: " << data.find_antinodes(true).ssize() << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

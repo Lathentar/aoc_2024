@@ -1,0 +1,99 @@
+ParsedData: type = {
+   // data members
+   initial_numbers : std::vector<i64> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      while inputStream.good() {
+         n : i64 = 0;
+         inputStream >> n;
+         initial_numbers.push_back( n );
+      }
+   }
+
+   generate_starting_buckets: ( this ) -> std::map<i64, i64> = {
+      buckets := std::map<i64, i64>();
+      for initial_numbers do (n) {
+         iter := buckets.insert( std::pair( n, 0 ) );
+         iter.first*.second += 1;
+      }
+      return buckets;
+   }
+}
+
+sim_rocks: (buckets: std::map<i64, i64>) -> std::map<i64, i64> = {
+   // Rock rules!
+   // If the stone is engraved with the number 0, it is replaced by a stone engraved with the number 1.
+   // If the stone is engraved with a number that has an even number of digits, it is replaced by two stones. 
+   //    The left half of the digits are engraved on the new left stone, and the right half of the digits are engraved on the new right stone. 
+   //    (The new numbers don't keep extra leading zeroes: 1000 would become stones 10 and 0.)
+   // If none of the other rules apply, the stone is replaced by a new stone; the old stone's number multiplied by 2024 is engraved on the new stone.
+   next_buckets := std::map<i64, i64>();
+   for buckets do (elem) {
+      number := elem.first;
+      count := elem.second;
+
+      if number == 0 {
+         iter := next_buckets.insert( std::pair( 1, 0 ) );
+         iter.first*.second += count;
+      }
+      else {
+         num_as_string := std::to_string( number );
+         if num_as_string.ssize() % 2 == 0 {
+            rhs := std::stoi( num_as_string.substr(num_as_string.ssize() / 2) );
+            lhs := std::stoi( num_as_string.substr(0, num_as_string.ssize() / 2) );
+            riter := next_buckets.insert( std::pair( rhs, 0 ) );
+            riter.first*.second += count;
+            liter := next_buckets.insert( std::pair( lhs, 0 ) );
+            liter.first*.second += count;
+         }
+         else {
+            iter := next_buckets.insert( std::pair( number * 2024, 0 ) );
+            iter.first*.second += count;
+         }
+      }
+   }
+   return next_buckets;
+}
+
+sim_rocks_n: (data: ParsedData, n: i64) -> i64 = {
+   buckets := data.generate_starting_buckets();
+   blinks := 1;
+   while blinks <= n next blinks++ {
+      buckets = sim_rocks(buckets);
+      //std::cout << "Blinks " << blinks << std::endl;
+      //for buckets do (b) {
+      //   std::cout << b.first << " (" << b.second << ") ";
+      //}
+      //std::cout << std::endl;
+   }
+
+   sum : i64 = 0;
+   for buckets do (elem) {
+      sum += elem.second;
+   }
+   return sum;
+}
+
+solve_part1: (data: ParsedData) = {
+   std::cout << "Part One: " << sim_rocks_n(data, 25) << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   std::cout << "Part Two: " << sim_rocks_n(data, 75) << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

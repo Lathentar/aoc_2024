@@ -1,0 +1,150 @@
+Connection: @value type = {
+   public lhs : std::string = ();
+   public rhs : std::string = ();
+
+   operator=: (out this, a: std::string, b: std::string) = {
+      if a < b {
+         lhs = a;
+         rhs = b;
+      }
+      else {
+         lhs = b;
+         rhs = a;
+      }
+   }
+}
+
+ConnectionSet: @value type = {
+   public comps : std::set<std::string> = ();
+}
+
+ParsedData: type = {
+   // data members
+   public connections : std::vector<Connection> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      line := std::string();
+      while getline( inputStream, line ) && !line.empty() {
+         connections.push_back( Connection( line.substr(0, 2), line.substr(3, 2) ) );
+      }
+   }
+}
+
+find_computer_triple: (connections: std::vector<Connection>) -> std::set<ConnectionSet> = {
+   connectionSets := std::set<ConnectionSet>();
+   connectionMap := std::map<std::string, std::set<std::string>>();
+   computers := std::set<std::string>();
+
+   // Seed the connection map and computer set
+   for connections do (conn) {
+      computers.insert( conn.lhs );
+      computers.insert( conn.rhs );
+      
+      connectionMap[ conn.lhs ].insert( conn.rhs );
+      connectionMap[ conn.rhs ].insert( conn.lhs );
+   }
+
+   for connections do (conn) {
+      out := std::vector< std::string >();
+      std::ranges::set_intersection( connectionMap[ conn.lhs ], connectionMap[ conn.rhs ], std::back_inserter(out) );
+      for out do (c) {
+         connSet := ConnectionSet();
+         connSet.comps.insert( conn.lhs );
+         connSet.comps.insert( conn.rhs );
+         connSet.comps.insert( c );
+
+         connectionSets.insert( connSet );
+      }
+   }
+
+   return connectionSets;
+}
+
+find_computer_maximal_clique: (connections: std::vector<Connection>) -> ConnectionSet = {
+   connectionSets := std::set<ConnectionSet>();
+   connectionMap := std::map<std::string, std::set<std::string>>();
+   computers := std::set<std::string>();
+
+   // Seed the connection map and computer set
+   for connections do (conn) {
+      computers.insert( conn.lhs );
+      computers.insert( conn.rhs );
+      
+      connectionMap[ conn.lhs ].insert( conn.rhs );
+      connectionMap[ conn.rhs ].insert( conn.lhs );
+      
+      connSet := ConnectionSet();
+      connSet.comps.insert( conn.lhs );
+      connSet.comps.insert( conn.rhs );
+
+      connectionSets.insert( connSet );
+   }
+
+   while connectionSets.ssize() > 1 {
+      newConnectionSet := std::set<ConnectionSet>();
+
+      for connectionSets do (connSet) {
+         for computers do (comp) {
+            if !connSet.comps.contains( comp ) {
+               out := std::set< std::string >();
+               std::ranges::set_intersection( connSet.comps, connectionMap[ comp ], std::inserter(out, out.begin()));
+               
+               if ( out.ssize() == connSet.comps.ssize() ) {
+                  newConnSet := ConnectionSet();
+                  newConnSet.comps = out;
+                  newConnSet.comps.insert( comp );
+
+                  newConnectionSet.insert( newConnSet );
+               }
+            }
+         }
+      }
+
+      connectionSets = newConnectionSet;
+      //std::cout << "Connections size " << connectionSets.begin()*.comps.ssize() << " count " << connectionSets.ssize() << std::endl;
+   }
+
+   return connectionSets.begin()*;
+}
+
+solve_part1: (data: ParsedData) = {
+   sets := find_computer_triple( data.connections );
+
+   // Find all sets with computer starting with a t
+   sum := 0;
+   for sets do (cs) {
+      for cs.comps do (comp) {
+         if comp[ 0 ] == 't' {
+            sum += 1;
+            break;
+         }
+      }
+   }
+
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+   set := find_computer_maximal_clique( data.connections );
+   output := std::string();
+   for set.comps do (c) {
+      output += c + ",";
+   }
+   std::cout << "Part Two: " << output << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
+

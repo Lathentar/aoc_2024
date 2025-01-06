@@ -1,0 +1,114 @@
+ParsedData: type = {
+   // data members
+   public numbers: std::vector<i64> = ();
+
+   // parse from the stream
+   operator=: (out this, move inputStream: std::istream) = {
+      while inputStream.good() {
+         num : i64 = 0;
+         inputStream >> num;
+         numbers.push_back( num );
+      }
+   }
+}
+
+mix_number: (secret_num: i64, value: i64) -> i64 = {
+   // To mix a value into the secret number, calculate the bitwise XOR of the given value and the secret number. 
+   // Then, the secret number becomes the result of that operation. 
+   // (If the secret number is 42 and you were to mix 15 into the secret number, the secret number would become 37.)
+   return secret_num ^ value; 
+}
+
+prune_number: (secret_number: i64) -> i64 = {
+   // To prune the secret number, calculate the value of the secret number modulo 16777216. 
+   // Then, the secret number becomes the result of that operation. 
+   // (If the secret number is 100000000 and you were to prune the secret number, the secret number would become 16113920.)
+   return secret_number % 16777216;
+}
+
+next_secret_number: (num: i64) -> i64 = {
+
+   // Calculate the result of multiplying the secret number by 64. 
+   // Then, mix this result into the secret number.
+   // Finally, prune the secret number.
+   next_num := prune_number( mix_number( num, num * 64 ) );
+
+   // Calculate the result of dividing the secret number by 32. 
+   // Round the result down to the nearest integer. Then, mix this result into the secret number. Finally, prune the secret number.
+   next_num = prune_number( mix_number( next_num, next_num / 32 ) );
+  
+   // Calculate the result of multiplying the secret number by 2048. 
+   // Then, mix this result into the secret number. Finally, prune the secret number.
+   next_num = prune_number( mix_number( next_num, next_num * 2048 ) );
+
+   return next_num;
+}
+
+solve_part1: (data: ParsedData) = {
+   sum : i64 = 0;
+   for data.numbers do (num) {
+      sn := num;
+      for 0 ..< 2000 do (_) {
+         sn = next_secret_number(sn);
+      }
+      sum += sn;
+   }
+   std::cout << "Part One: " << sum << std::endl;
+}
+
+solve_part2: (data: ParsedData) = {
+
+   most_bananas_for_buyers := std::map< std::array<i64, 4>, i64 >();
+
+   for data.numbers do (num) {
+      most_bananas_for_deltas := std::map< std::array<i64, 4>, i64 >();
+      deltas : std::array<i64, 4> = (0, 0, 0, 0);
+
+      sn := num;
+      bananas := sn % 10;
+      for 0 ..< 2000 do (i) {
+         // next secret number
+         sn = next_secret_number(sn);
+
+         // update deltas
+         std::shift_left(deltas.begin(), deltas.end(), 1);
+         prev_bananas := bananas;
+         bananas = sn % 10;
+         deltas[3] = bananas - prev_bananas;
+
+         // once we have 4 deltas check for the most!
+         if i >= 3 && !most_bananas_for_deltas.contains(deltas) {
+            most_bananas_for_deltas[deltas] = bananas;
+         }
+      }
+
+      for most_bananas_for_deltas do (entry) {
+         most_bananas_for_buyers[entry.first] += entry.second;
+      }
+   }
+
+   max_bananas : i64 = 0;
+   deltas : std::array<i64, 4> = (0, 0, 0, 0);
+   for most_bananas_for_buyers do (entry) {
+      if max_bananas < entry.second {
+         max_bananas = entry.second;
+         deltas = entry.first;
+      }
+   }
+
+   std::cout << "Part Two: (max_bananas)$ ( (deltas[0])$, (deltas[1])$, (deltas[2])$, (deltas[3])$ )" << std::endl;
+}
+
+main: (args) = {
+   if args.ssize() < 2 {
+      std::cout << "Not enough arguments passed" << std::endl;
+      exit(1);
+   }
+
+   fileName : std::string = args[1];
+   fileStream := std::ifstream( fileName );
+   parsed_data : ParsedData = fileStream;
+
+   solve_part1( parsed_data );
+   solve_part2( parsed_data );
+}
